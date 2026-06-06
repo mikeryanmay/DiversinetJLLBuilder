@@ -1,0 +1,14 @@
+# BinaryBuilder scratch/build outputs
+build/
+products/
+
+# Local source snapshots. Prefer reproducible upstream sources in build_tarballs.jl.
+sources/*.tar.gz
+
+# macOS/filesystem noise
+.DS_Store
+._*
+
+# Local logs/debug artifacts
+*.log
+*.dSYM/
