@@ -14,6 +14,8 @@ jobs:
     name: ${{ matrix.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      BINARYBUILDER_RUNNER: docker
     strategy:
       fail-fast: false
       matrix:
@@ -38,7 +40,7 @@ jobs:
 
       - name: Build and audit artifact
         shell: bash
-        run: julia --startup-file=no --project=. build_tarballs.jl "${{ matrix.target }}" --verbose
+        run: julia --startup-file=no --project=. build_tarballs.jl "${{ matrix.target }}" --verbose 2>&1 | tee binarybuilder.log
 
       - name: Upload artifact and logs
         if: always()
@@ -47,5 +49,6 @@ jobs:
           name: Diversinet-${{ matrix.target }}
           path: |
             products/
+            binarybuilder.log
             build/**/*.log
           if-no-files-found: warn
