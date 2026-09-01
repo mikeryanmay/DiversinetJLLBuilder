@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 120
     env:
       BINARYBUILDER_RUNNER: docker
+      BINARYBUILDER_AUTOMATIC_APPLE: "true"
     strategy:
       fail-fast: false
       matrix:
