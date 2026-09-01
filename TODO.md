@@ -115,7 +115,7 @@ the core C++ library.
 
   ```text
   $prefix/lib/libdiversinet.*
-  $prefix/include/DiversinetInterface.h
+  $prefix/include/Diversinet/DiversinetInterface.h
   $prefix/lib/pkgconfig/diversinet.pc
   ```
 

@@ -1,0 +1,51 @@
+name: Build JLL artifacts
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-apple-darwin-julia_version+1.12.0
+          - x86_64-apple-darwin-julia_version+1.12.0
+          - aarch64-linux-gnu-libgfortran5-cxx11-julia_version+1.12.0
+          - x86_64-linux-gnu-libgfortran5-cxx11-julia_version+1.12.0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+
+      - uses: julia-actions/cache@v2
+
+      - name: Instantiate BinaryBuilder
+        shell: bash
+        run: julia --startup-file=no --project=. -e 'import Pkg; Pkg.instantiate()'
+
+      - name: Build and audit artifact
+        shell: bash
+        run: julia --startup-file=no --project=. build_tarballs.jl "${{ matrix.target }}" --verbose
+
+      - name: Upload artifact and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Diversinet-${{ matrix.target }}
+          path: |
+            products/
+            build/**/*.log
+          if-no-files-found: warn
