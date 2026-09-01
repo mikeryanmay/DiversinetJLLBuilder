@@ -108,6 +108,7 @@ if [[ "${target}" == *apple* ]]; then
     "${target}-clang++" \
         -dynamiclib \
         -install_name "@rpath/libjlDiversinetInterface.dylib" \
+        -Wl,-undefined,dynamic_lookup \
         -Wl,-rpath,@loader_path \
         -o "${libdir}/libjlDiversinetInterface.dylib" \
         build/jlDiversinetInterface.o \
