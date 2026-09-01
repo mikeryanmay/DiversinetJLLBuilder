@@ -53,3 +53,59 @@ jobs:
             binarybuilder.log
             build/**/*.log
           if-no-files-found: warn
+
+  package-and-test:
+    name: Generate and smoke-test JLL wrapper
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+
+      - uses: julia-actions/cache@v2
+
+      - name: Instantiate BinaryBuilder
+        shell: bash
+        run: julia --startup-file=no --project=. -e 'import Pkg; Pkg.instantiate()'
+
+      - name: Download all platform products
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Diversinet-*
+          path: .
+          merge-multiple: true
+
+      - name: Generate local JLL wrapper
+        shell: bash
+        run: >-
+          julia --startup-file=no --project=. build_tarballs.jl
+          'aarch64-apple-darwin-julia_version+1.12.0,x86_64-apple-darwin-julia_version+1.12.0,aarch64-linux-gnu-libgfortran5-cxx11-julia_version+1.12.0,x86_64-linux-gnu-libgfortran5-cxx11-julia_version+1.12.0'
+          --skip-build --deploy=local --verbose
+
+      - name: Smoke-test generated wrapper in a clean depot
+        shell: bash
+        env:
+          JULIA_DEPOT_PATH: ${{ runner.temp }}/diversinet-clean-depot
+        run: |
+          julia --startup-file=no -e '
+              import Pkg
+              Pkg.develop(path=joinpath(ENV["HOME"], ".julia", "dev", "Diversinet_jll"))
+              Pkg.instantiate()
+              using Diversinet_jll, Libdl
+              @assert isfile(Diversinet_jll.libdiversinet)
+              @assert isfile(Diversinet_jll.libjlDiversinetInterface)
+              Libdl.dlclose(Libdl.dlopen(Diversinet_jll.libdiversinet))
+              Libdl.dlclose(Libdl.dlopen(Diversinet_jll.libjlDiversinetInterface))
+          '
+
+      - name: Upload generated wrapper
+        uses: actions/upload-artifact@v4
+        with:
+          name: Diversinet_jll-generated-wrapper
+          path: ~/.julia/dev/Diversinet_jll
+          if-no-files-found: error
