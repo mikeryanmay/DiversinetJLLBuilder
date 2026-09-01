@@ -12,3 +12,6 @@ sources/*.tar.gz
 # Local logs/debug artifacts
 *.log
 *.dSYM/
+
+# Downloaded GitHub Actions diagnostics
+Diversinet-*.zip
