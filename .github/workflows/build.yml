@@ -47,7 +47,12 @@ jobs:
 
       - name: Build and audit artifact
         shell: bash
-        run: julia --startup-file=no --project=. build_tarballs.jl "${{ matrix.target }}" --verbose 2>&1 | tee binarybuilder.log
+        run: |
+          julia --startup-file=no --project=. build_tarballs.jl "${{ matrix.target }}" --verbose 2>&1 | tee binarybuilder.log
+          if grep -Fq 'Linked library libgcc_s.so.1 could not be resolved' binarybuilder.log; then
+              echo 'BinaryBuilder did not resolve libgcc_s.so.1 from CompilerSupportLibraries_jll.' >&2
+              exit 1
+          fi
 
       - name: Upload artifact and logs
         if: always()
