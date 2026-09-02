@@ -15,9 +15,6 @@ on:
 permissions:
   contents: read
 
-env:
-  DIVERSINET_JLL_VERSION: '0.1.0+1'
-
 jobs:
   build:
     name: ${{ matrix.target }}
@@ -121,6 +118,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.publish
         shell: bash
         env:
+          DIVERSINET_JLL_VERSION: '0.1.0+1'
           GITHUB_TOKEN: ${{ secrets.JLL_DEPLOY_TOKEN }}
           JULIA_DEPOT_PATH: '${{ runner.temp }}/diversinet-publish-depot:'
         run: |
