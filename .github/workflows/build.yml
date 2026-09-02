@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the generated JLL and binaries to Diversinet_jll
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -102,6 +108,17 @@ jobs:
               Libdl.dlclose(Libdl.dlopen(Diversinet_jll.libdiversinet))
               Libdl.dlclose(Libdl.dlopen(Diversinet_jll.libjlDiversinetInterface))
           '
+
+      - name: Publish JLL wrapper and binary release
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.JLL_DEPLOY_TOKEN }}
+          JULIA_DEPOT_PATH: '${{ runner.temp }}/diversinet-publish-depot:'
+        run: >-
+          julia --startup-file=no --project=. build_tarballs.jl
+          'aarch64-apple-darwin-julia_version+1.12.0,x86_64-apple-darwin-julia_version+1.12.0,aarch64-linux-gnu-libgfortran5-cxx11-julia_version+1.12.0,x86_64-linux-gnu-libgfortran5-cxx11-julia_version+1.12.0'
+          --skip-build --deploy=mikeryanmay/Diversinet_jll --verbose
 
       - name: Upload generated wrapper
         uses: actions/upload-artifact@v4
