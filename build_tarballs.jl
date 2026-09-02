@@ -2,7 +2,11 @@ using BinaryBuilder
 using Pkg
 
 name = "Diversinet"
-version = v"0.1.0"
+upstream_version = v"0.1.0"
+# Outside a registry, BinaryBuilder cannot discover previously published JLL
+# build numbers. CI therefore supplies the complete self-hosted JLL version.
+# Yggdrasil can omit this environment variable and derive +N from General.
+version = VersionNumber(get(ENV, "DIVERSINET_JLL_VERSION", string(upstream_version)))
 
 sources = [
     GitSource(
