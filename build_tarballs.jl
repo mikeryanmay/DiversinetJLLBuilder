@@ -153,8 +153,9 @@ products = [
 
 dependencies = [
     Dependency("boost_jll"),
-    Dependency("Eigen_jll"),
+    Dependency("CompilerSupportLibraries_jll"),
     Dependency("libcxxwrap_julia_jll"; compat = "0.14.10"),
+    BuildDependency("Eigen_jll"),
     # Julia 1.12 is selected by each platform tag. libjulia_jll 1.11 supplies
     # build-only C headers; newer libjulia_jll releases are not registered.
     BuildDependency(PackageSpec(; name = "libjulia_jll", version = "1.11.0")),

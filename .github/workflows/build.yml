@@ -129,3 +129,56 @@ jobs:
           name: Diversinet_jll-generated-wrapper
           path: ~/.julia/dev/Diversinet_jll
           if-no-files-found: error
+
+  native-published-smoke-test:
+    name: Published JLL smoke test (${{ matrix.os }})
+    needs: package-and-test
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - macos-15-intel
+          - macos-15
+
+    steps:
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+
+      - name: Install and initialize the published JLL
+        shell: bash
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: '0'
+        run: |
+          julia --startup-file=no -e '
+              import Pkg
+              Pkg.add(url="https://github.com/mikeryanmay/Diversinet_jll.git")
+              Pkg.add(name="CxxWrap", version="0.17")
+              import Diversinet_jll, Libdl
+              module DiversinetBridgeSmoke
+                  using CxxWrap
+                  import Diversinet_jll
+                  @wrapmodule(() -> Diversinet_jll.libjlDiversinetInterface)
+                  function __init__()
+                      @initcxx
+                  end
+              end
+              DiversinetBridgeSmoke.__init__()
+              core = realpath(Diversinet_jll.libdiversinet)
+              @assert isfile(core)
+              @assert isfile(Diversinet_jll.libjlDiversinetInterface)
+              Libdl.dlclose(Libdl.dlopen(core))
+              Libdl.dlclose(Libdl.dlopen(Diversinet_jll.libjlDiversinetInterface))
+              loaded_core = filter(
+                  path -> occursin("libdiversinet", lowercase(path)) &&
+                          realpath(path) == core,
+                  Libdl.dllist(),
+              )
+              @assert !isempty(loaded_core)
+              println("CxxWrap initialized with artifact core: ", core)
+          '
