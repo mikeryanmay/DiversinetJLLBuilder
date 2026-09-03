@@ -1,82 +1,65 @@
-# Diversinet_jll Local Build Notes
+# DiversinetJLLBuilder
 
-This workspace is for developing a BinaryBuilder recipe for the native
-`libdiversinet` library.
+[![Build JLL artifacts](https://github.com/mikeryanmay/DiversinetJLLBuilder/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/mikeryanmay/DiversinetJLLBuilder/actions/workflows/build.yml?query=branch%3Amain)
 
-The current recipe builds a core-only JLL:
+This repository owns the BinaryBuilder recipe and GitHub Actions workflow that
+produce the generated
+[Diversinet_jll](https://github.com/mikeryanmay/Diversinet_jll) package.
+
+Each artifact contains both native libraries needed by
+[Diversinet.jl](https://github.com/mikeryanmay/Diversinet.jl):
 
 ```text
-Diversinet_jll provides libdiversinet
-Diversinet.jl builds/loads its CxxWrap bridge separately
+libdiversinet
+libjlDiversinetInterface
 ```
 
-## 1. Refresh The Local Source Archive
+Ordinary Diversinet users do not need this repository. They install
+`Diversinet.jl` through `DiversinetRegistry`, which resolves the published JLL.
 
-Run this after changing `~/repos/phyloploid_lib`:
+## Source inputs
 
-```sh
-cd ~/repos/Diversinet_jll
+`build_tarballs.jl` uses immutable `GitSource` commits from the public
+`Diversinet` and `Diversinet.jl` repositories. It does not read local source
+checkouts or local source archives. Update both source commits when preparing
+a release whose C++ core or CxxWrap bridge changed.
 
-env COPYFILE_DISABLE=1 LC_ALL=C tar \
-  --exclude=.git \
-  --exclude=build \
-  --exclude=builddir \
-  --exclude=build-meson \
-  --exclude=.DS_Store \
-  --exclude='._*' \
-  --exclude=ide \
-  --exclude=.vscode \
-  --exclude=lib \
-  -czf sources/phyloploid_lib-local.tar.gz \
-  -C ~/repos phyloploid_lib
-```
+## Local build
 
-Then compute the new archive hash:
+Install Julia 1.12, start Docker, instantiate the builder environment, and run
+the recipe:
 
 ```sh
-shasum -a 256 sources/phyloploid_lib-local.tar.gz
-```
-
-Copy that SHA256 into the `ArchiveSource` entry in `build_tarballs.jl`.
-
-## 2. Build Product Tarballs
-
-Build all platforms listed in `build_tarballs.jl`:
-
-```sh
-cd ~/repos/Diversinet_jll
-
-BINARYBUILDER_AUTOMATIC_APPLE=true julia --project=. build_tarballs.jl --verbose
+cd /path/to/DiversinetJLLBuilder
+julia --startup-file=no --project=. -e 'import Pkg; Pkg.instantiate()'
+BINARYBUILDER_RUNNER=docker BINARYBUILDER_AUTOMATIC_APPLE=true julia --startup-file=no --project=. build_tarballs.jl --verbose
 ```
 
 The generated binary tarballs are written to `products/`.
 
-Current target platforms:
+The current release targets Julia 1.12 on:
 
 ```text
 aarch64-apple-darwin
 aarch64-linux-gnu-libgfortran5-cxx11
+x86_64-apple-darwin
 x86_64-linux-gnu-libgfortran5-cxx11
 ```
 
 The Linux targets are explicitly set to `libgfortran5`/`cxx11` so BinaryBuilder
 uses a C++20-capable GCC toolchain.
 
-The macOS target is built manually with BinaryBuilder's clang toolchain so the
-core library uses Apple's libc++ ABI. That keeps it compatible with the local
-CxxWrap bridge built by `Diversinet.jl`.
+The Apple targets use BinaryBuilder's clang/libc++ toolchain. The Linux targets
+use GCC with the `cxx11` string ABI. Command-line programs and C++ tests are
+disabled because the artifacts contain the reusable libraries only.
 
-## 3. Regenerate The JLL Wrapper Package
+## Generate and test a local wrapper
 
 After the product tarballs exist, generate the local wrapper package without
 uploading anything:
 
 ```sh
-cd ~/repos/Diversinet_jll
-
-BINARYBUILDER_AUTOMATIC_APPLE=true julia --project=. build_tarballs.jl \
-  --deploy-jll=local \
-  --skip-build
+BINARYBUILDER_AUTOMATIC_APPLE=true julia --startup-file=no --project=. build_tarballs.jl --skip-build --deploy=local --verbose
 ```
 
 This writes the generated package to:
@@ -85,52 +68,30 @@ This writes the generated package to:
 ~/.julia/dev/Diversinet_jll
 ```
 
-## 4. Smoke Test The Generated JLL
-
-Develop the generated JLL into a temporary Julia environment and verify it
-exposes and loads `libdiversinet`:
+Develop the generated JLL into a temporary Julia environment and verify both
+libraries exist and load:
 
 ```sh
-cd ~/repos/Diversinet_jll
-
-julia --startup-file=no --temp --project -e '
-  import Pkg
-  Pkg.develop(path=joinpath(homedir(), ".julia/dev/Diversinet_jll"))
-  Pkg.instantiate()
-  using Libdl, Diversinet_jll
-  println(Diversinet_jll.libdiversinet)
-  h = Libdl.dlopen(Diversinet_jll.libdiversinet)
-  println(h != C_NULL)
-  Libdl.dlclose(h)
-'
+julia --startup-file=no --temp --project -e 'import Pkg; Pkg.develop(path=joinpath(homedir(), ".julia/dev/Diversinet_jll")); Pkg.instantiate(); using Libdl, Diversinet_jll; for library in (Diversinet_jll.libdiversinet, Diversinet_jll.libjlDiversinetInterface); @assert isfile(library); Libdl.dlclose(Libdl.dlopen(library)); end'
 ```
 
-Expected final output includes:
+## Continuous integration and publication
 
-```text
-true
-```
+Every push and pull request builds and audits all four targets, generates a
+local JLL wrapper, and tests both libraries. These runs do not publish a
+release.
 
-On macOS, verify that the artifact uses libc++ and exports the `std::__1` ABI:
+To publish intentionally, run the **Build JLL artifacts** workflow manually
+with its `publish` input enabled. Before dispatching it:
 
-```sh
-otool -L ~/.julia/artifacts/8d815a9646d1544826e973abeb74f5d1bca476a6/lib/libdiversinet.dylib
-nm -gU ~/.julia/artifacts/8d815a9646d1544826e973abeb74f5d1bca476a6/lib/libdiversinet.dylib | rg 'readNewick|__cxx11|__1'
-```
+1. Update the immutable source commits in `build_tarballs.jl`.
+2. Set `upstream_version` for a new upstream release.
+3. Increment `DIVERSINET_JLL_VERSION` in the publication workflow. Build
+   numbers use Julia's `MAJOR.MINOR.PATCH+N` convention and are never reused.
+4. Let the ordinary CI build pass.
+5. Dispatch publication and verify the generated `Diversinet_jll` release on
+   all four operating-system/architecture combinations.
 
-## Known Warnings
-
-BinaryBuilder currently packages successfully, but reports:
-
-```text
-Unable to find valid license file in "${prefix}/share/licenses/Diversinet"
-```
-
-Linux also reports:
-
-```text
-Linked library libgcc_s.so.1 could not be resolved and could not be auto-mapped
-```
-
-The Linux warning should be resolved or understood before treating the JLL as
-release-ready.
+Publication requires the repository secret `JLL_DEPLOY_TOKEN`, with permission
+to write the separate `Diversinet_jll` repository. Normal CI needs no deploy
+credential.
